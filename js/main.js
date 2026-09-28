@@ -5,12 +5,33 @@
   var label = document.querySelector(".nav-toggle-label");
   var links = Array.prototype.slice.call(document.querySelectorAll(".site-nav a"));
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var lastFocus = null;
+
+  function focusables() {
+    if (!nav || !toggle) return [];
+    return [toggle].concat(
+      Array.prototype.slice.call(
+        nav.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      )
+    );
+  }
 
   function setMenu(open) {
     if (!toggle || !nav) return;
-    nav.classList.toggle("is-open", open);
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (label) label.textContent = open ? "Cerrar" : "Menú";
+    var isOpen = Boolean(open);
+    nav.classList.toggle("is-open", isOpen);
+    document.body.classList.toggle("nav-open", isOpen);
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    if (label) label.textContent = isOpen ? "Cerrar" : "Menú";
+
+    if (isOpen) {
+      lastFocus = document.activeElement;
+      var firstLink = nav.querySelector("a");
+      if (firstLink) firstLink.focus();
+    } else if (lastFocus && typeof lastFocus.focus === "function") {
+      lastFocus.focus();
+      lastFocus = null;
+    }
   }
 
   if (toggle && nav) {
@@ -25,7 +46,27 @@
     });
 
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") setMenu(false);
+      if (!nav.classList.contains("is-open")) return;
+
+      if (event.key === "Escape") {
+        setMenu(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      var items = focusables();
+      if (!items.length) return;
+      var first = items[0];
+      var last = items[items.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     });
 
     window.addEventListener("resize", function () {
